@@ -1,0 +1,527 @@
+# TradeLedger Auth API Documentation
+
+Base URL: `http://localhost:5000`  
+Auth Base Path: `/auth`  
+Content-Type: `application/json` (except SSR verify route)
+
+---
+
+## 1) Register
+
+### Endpoint
+`POST /auth/register`
+
+### Description
+Creates a new user account, stores hashed password + public key, sends verification email.
+
+### Request JSON
+```json
+{
+  "business_name": "Acme Traders",
+  "email": "owner@acme.com",
+  "password": "StrongPass@123",
+  "phone": "+919999999999"
+}
+```
+
+### Response JSON Outcomes
+
+**201 Created**
+```json
+{
+  "message": "Registration successful. Please verify your email."
+}
+```
+
+**400 Bad Request** (missing required fields)
+```json
+{
+  "message": "business_name, email, password and phone are required"
+}
+```
+
+**409 Conflict** (email already exists)
+```json
+{
+  "message": "User already exists"
+}
+```
+
+**500 Internal Server Error** (unexpected server/DB/email failure)
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+---
+
+## 2) Verify Email (SSR)
+
+### Endpoint
+`GET /auth/verify-email?token=<RAW_TOKEN>`
+
+### Description
+Verifies email using token from email link. Returns HTML page (SSR), not JSON.
+
+### Request
+No JSON body. Token is query param.
+
+### HTML Outcomes
+
+**200 OK**
+- Page title: `Email Verified Successfully`
+- Message: `Your email has been verified. You can now log in.`
+
+**400 Bad Request** (missing token)
+- Page title: `Invalid or expired link`
+- Message: `Verification token is missing.`
+
+**400 Bad Request** (invalid/expired token)
+- Page title: `Invalid or expired link`
+- Message: `Invalid or expired link`
+
+**500 Internal Server Error**
+- Page from global error handling (JSON if thrown to middleware)
+
+---
+
+## 3) Login
+
+### Endpoint
+`POST /auth/login`
+
+### Description
+Authenticates verified user and returns JWT token.
+
+### Request JSON
+```json
+{
+  "email": "owner@acme.com",
+  "password": "StrongPass@123"
+}
+```
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "token": "<JWT_TOKEN>"
+}
+```
+
+**400 Bad Request** (missing email/password)
+```json
+{
+  "message": "Email and password are required"
+}
+```
+
+**401 Unauthorized** (invalid email or password)
+```json
+{
+  "message": "Invalid credentials"
+}
+```
+
+**403 Forbidden** (email not verified)
+```json
+{
+  "message": "Please verify your email before logging in"
+}
+```
+
+**500 Internal Server Error**
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+---
+
+## 4) Forgot Password
+
+### Endpoint
+`POST /auth/forgot-password`
+
+### Description
+Generates reset token, stores hashed token + expiry (15 min), sends reset email if user exists.
+
+### Request JSON
+```json
+{
+  "email": "owner@acme.com"
+}
+```
+
+### Response JSON Outcomes
+
+**200 OK** (always generic to avoid user enumeration)
+```json
+{
+  "message": "If the email exists, a reset link has been sent."
+}
+```
+
+**400 Bad Request** (missing email)
+```json
+{
+  "message": "Email is required"
+}
+```
+
+**500 Internal Server Error**
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+---
+
+## 5) Reset Password
+
+### Endpoint
+`POST /auth/reset-password`
+
+### Description
+Resets password using valid reset token and updates `password_updated_at`.
+
+### Request JSON
+```json
+{
+  "token": "<RAW_RESET_TOKEN>",
+  "new_password": "NewStrongPass@456"
+}
+```
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "message": "Password has been reset successfully"
+}
+```
+
+**400 Bad Request** (missing token/new_password)
+```json
+{
+  "message": "token and new_password are required"
+}
+```
+
+**400 Bad Request** (invalid or expired token)
+```json
+{
+  "message": "Invalid or expired reset token"
+}
+```
+
+**500 Internal Server Error**
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+---
+
+## 6) Get Key Seed (Protected)
+
+### Endpoint
+`POST /auth/get-key-seed`
+
+### Description
+Returns seed values (`created_at`, `password_updated_at`) after JWT + password check.  
+Private key is never returned.
+
+### Required Header
+`Authorization: Bearer <JWT_TOKEN>`
+
+### Request JSON
+```json
+{
+  "password": "StrongPass@123"
+}
+```
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "created_at": "2026-04-30T16:00:00.000Z",
+  "password_updated_at": "2026-04-30T16:00:00.000Z"
+}
+```
+
+**400 Bad Request** (missing password)
+```json
+{
+  "message": "Password is required"
+}
+```
+
+**401 Unauthorized** (missing/invalid JWT)
+```json
+{
+  "message": "Unauthorized"
+}
+```
+or
+```json
+{
+  "message": "Invalid or expired token"
+}
+```
+
+**401 Unauthorized** (wrong password)
+```json
+{
+  "message": "Invalid credentials"
+}
+```
+
+**404 Not Found** (user not found for token userId)
+```json
+{
+  "message": "User not found"
+}
+```
+
+**500 Internal Server Error**
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+---
+
+## Global / App-Level Routes
+
+### Health Check
+`GET /`
+
+**200 OK** (text response)
+```text
+API running
+```
+
+### Unknown Routes
+Any non-existing route returns:
+
+**404 Not Found**
+```json
+{
+  "message": "Route not found"
+}
+```
+
+---
+
+## Security Notes
+
+- Passwords are hashed using bcrypt.
+- Email/reset tokens are hashed before DB storage.
+- Token comparisons use timing-safe checks.
+- JWT auth is required for protected endpoint(s).
+- Email must be verified before login.
+- Private key is deterministic and never stored/returned.
+- SMTP credentials come from `.env` only.
+
+---
+
+# User Module API Documentation
+
+User Base Path: `/v1/api/users`  
+Requires Header: `Authorization: Bearer <JWT_TOKEN>` for all endpoints below.
+
+## 1) Get My Profile
+
+### Endpoint
+`GET /v1/api/users/me`
+
+### Description
+Returns full profile for logged-in user. Does not expose `password_hash` or private key.
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "id": 1,
+  "business_name": "ABC Traders",
+  "email": "abc@gmail.com",
+  "phone_primary": "9999999999",
+  "public_key": "PUBLIC_KEY_VALUE",
+  "details": {
+    "address": "Bangalore",
+    "phone": "9999999999",
+    "gst_number": "29ABCDE1234F1Z5"
+  }
+}
+```
+
+If no row exists in `user_details`, `details` will be `null`.
+
+**401 Unauthorized**
+```json
+{
+  "message": "Unauthorized"
+}
+```
+or
+```json
+{
+  "message": "Invalid or expired token"
+}
+```
+
+**404 Not Found**
+```json
+{
+  "message": "User not found"
+}
+```
+
+---
+
+## 2) Update My Profile
+
+### Endpoint
+`PUT /v1/api/users/me`
+
+### Description
+Updates `users` table (`business_name`, `phone_primary`) and updates/inserts row in `user_details` (`address`, `gst_number`).
+
+### Request JSON
+```json
+{
+  "business_name": "ABC Traders Pvt Ltd",
+  "phone_primary": "9999999999",
+  "address": "MG Road, Bangalore",
+  "gst_number": "29ABCDE1234F1Z5"
+}
+```
+
+### Validation
+- `business_name` is required and must be non-empty.
+- `gst_number` is optional, but if present must be valid GST format.
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "id": 1,
+  "business_name": "ABC Traders Pvt Ltd",
+  "email": "abc@gmail.com",
+  "phone_primary": "9999999999",
+  "public_key": "PUBLIC_KEY_VALUE",
+  "details": {
+    "address": "MG Road, Bangalore",
+    "phone": "9999999999",
+    "gst_number": "29ABCDE1234F1Z5"
+  }
+}
+```
+
+**400 Bad Request**
+```json
+{
+  "message": "business_name is required"
+}
+```
+or
+```json
+{
+  "message": "Invalid gst_number format"
+}
+```
+
+**404 Not Found**
+```json
+{
+  "message": "User not found"
+}
+```
+
+---
+
+## 3) Get Public User Profile
+
+### Endpoint
+`GET /v1/api/users/:id`
+
+### Description
+Returns only public profile fields for B2B discovery.
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "id": 2,
+  "business_name": "XYZ Suppliers",
+  "public_key": "PUBLIC_KEY_VALUE",
+  "gst_number": "27ABCDE1234F1Z9",
+  "is_verified": true
+}
+```
+
+### Not Returned
+- `email`
+- `phone_primary`
+- `password_hash`
+
+**404 Not Found**
+```json
+{
+  "message": "User not found"
+}
+```
+
+---
+
+## 4) Search Users
+
+### Endpoint
+`GET /v1/api/users/search?q=<search_text>`
+
+### Description
+Searches by `business_name` or `gst_number` (case-insensitive), limited to 10 results.
+
+### Query Parameter
+- `q` (required)
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "count": 2,
+  "results": [
+    {
+      "id": 1,
+      "business_name": "ABC Traders",
+      "gst_number": "29ABCDE1234F1Z5"
+    },
+    {
+      "id": 5,
+      "business_name": "ABC Components",
+      "gst_number": null
+    }
+  ]
+}
+```
+
+**400 Bad Request**
+```json
+{
+  "message": "Query parameter q is required"
+}
+```
