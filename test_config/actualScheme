@@ -1,0 +1,280 @@
+{
+  "generatedAt": "2026-05-01T11:22:53.529Z",
+  "totalTables": 5,
+  "tables": {
+    "public.blockchain": [
+      {
+        "column": "id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "nextval('blockchain_id_seq'::regclass)"
+      },
+      {
+        "column": "transaction_id",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "previous_hash",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "current_hash",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "block_data",
+        "type": "jsonb",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp without time zone",
+        "nullable": "YES",
+        "default": "CURRENT_TIMESTAMP"
+      }
+    ],
+    "public.requests": [
+      {
+        "column": "id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "nextval('requests_id_seq'::regclass)"
+      },
+      {
+        "column": "request_id",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "sender_id",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "receiver_id",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "request_data",
+        "type": "jsonb",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "is_reviewed",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "false"
+      },
+      {
+        "column": "reviewed_at",
+        "type": "timestamp without time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "is_converted_to_invoice",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "false"
+      },
+      {
+        "column": "sent_at",
+        "type": "timestamp without time zone",
+        "nullable": "YES",
+        "default": "CURRENT_TIMESTAMP"
+      },
+      {
+        "column": "is_seen",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "false"
+      },
+      {
+        "column": "seen_at",
+        "type": "timestamp without time zone",
+        "nullable": "YES",
+        "default": null
+      }
+    ],
+    "public.transactions": [
+      {
+        "column": "id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "nextval('transactions_id_seq'::regclass)"
+      },
+      {
+        "column": "invoice_id",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "sender_id",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "receiver_id",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "request_id",
+        "type": "character varying",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "invoice_data",
+        "type": "jsonb",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "is_accepted",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "false"
+      },
+      {
+        "column": "accepted_at",
+        "type": "timestamp without time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "is_on_blockchain",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "false"
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp without time zone",
+        "nullable": "YES",
+        "default": "CURRENT_TIMESTAMP"
+      }
+    ],
+    "public.user_details": [
+      {
+        "column": "id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "nextval('user_details_id_seq'::regclass)"
+      },
+      {
+        "column": "user_id",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "address",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "phone",
+        "type": "character varying",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "gst_number",
+        "type": "character varying",
+        "nullable": "YES",
+        "default": null
+      }
+    ],
+    "public.users": [
+      {
+        "column": "id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "nextval('users_id_seq'::regclass)"
+      },
+      {
+        "column": "business_name",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "email",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "password_hash",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "phone_primary",
+        "type": "character varying",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "public_key",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp without time zone",
+        "nullable": "YES",
+        "default": "CURRENT_TIMESTAMP"
+      },
+      {
+        "column": "password_updated_at",
+        "type": "timestamp without time zone",
+        "nullable": "YES",
+        "default": "CURRENT_TIMESTAMP"
+      },
+      {
+        "column": "is_verified",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "false"
+      },
+      {
+        "column": "email_verification_token",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "reset_password_token",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "reset_password_expires",
+        "type": "timestamp without time zone",
+        "nullable": "YES",
+        "default": null
+      }
+    ]
+  }
+}

@@ -44,6 +44,8 @@ CREATE TABLE transactions (
     receiver_id INT REFERENCES users(id),
     request_id VARCHAR(100),
     invoice_data JSONB NOT NULL,
+    is_seen BOOLEAN DEFAULT FALSE,
+    seen_at TIMESTAMP,
     is_accepted BOOLEAN DEFAULT FALSE,
     accepted_at TIMESTAMP,
     is_on_blockchain BOOLEAN DEFAULT FALSE,

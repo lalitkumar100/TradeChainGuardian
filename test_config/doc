@@ -1,0 +1,1259 @@
+# TradeLedger Auth API Documentation
+
+Base URL: `http://localhost:5000`  
+Auth Base Path: `/auth`  
+Content-Type: `application/json` (except SSR verify route)
+
+---
+
+## 1) Register
+
+### Endpoint
+`POST /auth/register`
+
+### Description
+Creates a new user account, stores hashed password + public key, sends verification email.
+
+### Request JSON
+```json
+{
+  "business_name": "Acme Traders",
+  "email": "owner@acme.com",
+  "password": "StrongPass@123",
+  "phone": "+919999999999"
+}
+```
+
+### Response JSON Outcomes
+
+**201 Created**
+```json
+{
+  "message": "Registration successful. Please verify your email."
+}
+```
+
+**400 Bad Request** (missing required fields)
+```json
+{
+  "message": "business_name, email, password and phone are required"
+}
+```
+
+**409 Conflict** (email already exists)
+```json
+{
+  "message": "User already exists"
+}
+```
+
+**500 Internal Server Error** (unexpected server/DB/email failure)
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+---
+
+## 2) Verify Email (SSR)
+
+### Endpoint
+`GET /auth/verify-email?token=<RAW_TOKEN>`
+
+### Description
+Verifies email using token from email link. Returns HTML page (SSR), not JSON.
+
+### Request
+No JSON body. Token is query param.
+
+### HTML Outcomes
+
+**200 OK**
+- Page title: `Email Verified Successfully`
+- Message: `Your email has been verified. You can now log in.`
+
+**400 Bad Request** (missing token)
+- Page title: `Invalid or expired link`
+- Message: `Verification token is missing.`
+
+**400 Bad Request** (invalid/expired token)
+- Page title: `Invalid or expired link`
+- Message: `Invalid or expired link`
+
+**500 Internal Server Error**
+- Page from global error handling (JSON if thrown to middleware)
+
+---
+
+## 3) Login
+
+### Endpoint
+`POST /auth/login`
+
+### Description
+Authenticates verified user and returns JWT token.
+
+### Request JSON
+```json
+{
+  "email": "owner@acme.com",
+  "password": "StrongPass@123"
+}
+```
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "token": "<JWT_TOKEN>"
+}
+```
+
+**400 Bad Request** (missing email/password)
+```json
+{
+  "message": "Email and password are required"
+}
+```
+
+**401 Unauthorized** (invalid email or password)
+```json
+{
+  "message": "Invalid credentials"
+}
+```
+
+**403 Forbidden** (email not verified)
+```json
+{
+  "message": "Please verify your email before logging in"
+}
+```
+
+**500 Internal Server Error**
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+---
+
+## 4) Forgot Password
+
+### Endpoint
+`POST /auth/forgot-password`
+
+### Description
+Generates reset token, stores hashed token + expiry (15 min), sends reset email if user exists.
+
+### Request JSON
+```json
+{
+  "email": "owner@acme.com"
+}
+```
+
+### Response JSON Outcomes
+
+**200 OK** (always generic to avoid user enumeration)
+```json
+{
+  "message": "If the email exists, a reset link has been sent."
+}
+```
+
+**400 Bad Request** (missing email)
+```json
+{
+  "message": "Email is required"
+}
+```
+
+**500 Internal Server Error**
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+---
+
+## 5) Reset Password
+
+### Endpoint
+`POST /auth/reset-password`
+
+### Description
+Resets password using valid reset token and updates `password_updated_at`.
+
+### Request JSON
+```json
+{
+  "token": "<RAW_RESET_TOKEN>",
+  "new_password": "NewStrongPass@456"
+}
+```
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "message": "Password has been reset successfully"
+}
+```
+
+**400 Bad Request** (missing token/new_password)
+```json
+{
+  "message": "token and new_password are required"
+}
+```
+
+**400 Bad Request** (invalid or expired token)
+```json
+{
+  "message": "Invalid or expired reset token"
+}
+```
+
+**500 Internal Server Error**
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+---
+
+## 6) Get Key Seed (Protected)
+
+### Endpoint
+`POST /auth/get-key-seed`
+
+### Description
+Returns seed values (`created_at`, `password_updated_at`) after JWT + password check.  
+Private key is never returned.
+
+### Required Header
+`Authorization: Bearer <JWT_TOKEN>`
+
+### Request JSON
+```json
+{
+  "password": "StrongPass@123"
+}
+```
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "created_at": "2026-04-30T16:00:00.000Z",
+  "password_updated_at": "2026-04-30T16:00:00.000Z"
+}
+```
+
+**400 Bad Request** (missing password)
+```json
+{
+  "message": "Password is required"
+}
+```
+
+**401 Unauthorized** (missing/invalid JWT)
+```json
+{
+  "message": "Unauthorized"
+}
+```
+or
+```json
+{
+  "message": "Invalid or expired token"
+}
+```
+
+**401 Unauthorized** (wrong password)
+```json
+{
+  "message": "Invalid credentials"
+}
+```
+
+**404 Not Found** (user not found for token userId)
+```json
+{
+  "message": "User not found"
+}
+```
+
+**500 Internal Server Error**
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+---
+
+## Global / App-Level Routes
+
+### Health Check
+`GET /`
+
+**200 OK** (text response)
+```text
+API running
+```
+
+### Unknown Routes
+Any non-existing route returns:
+
+**404 Not Found**
+```json
+{
+  "message": "Route not found"
+}
+```
+
+---
+
+## Security Notes
+
+- Passwords are hashed using bcrypt.
+- Email/reset tokens are hashed before DB storage.
+- Token comparisons use timing-safe checks.
+- JWT auth is required for protected endpoint(s).
+- Email must be verified before login.
+- Private key is deterministic and never stored/returned.
+- SMTP credentials come from `.env` only.
+
+---
+
+# User Module API Documentation
+
+User Base Path: `/v1/api/users`  
+Requires Header: `Authorization: Bearer <JWT_TOKEN>` for all endpoints below.
+
+## 1) Get My Profile
+
+### Endpoint
+`GET /v1/api/users/me`
+
+### Description
+Returns full profile for logged-in user. Does not expose `password_hash` or private key.
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "id": 1,
+  "business_name": "ABC Traders",
+  "email": "abc@gmail.com",
+  "phone_primary": "9999999999",
+  "public_key": "PUBLIC_KEY_VALUE",
+  "details": {
+    "address": "Bangalore",
+    "phone": "9999999999",
+    "gst_number": "29ABCDE1234F1Z5"
+  }
+}
+```
+
+If no row exists in `user_details`, `details` will be `null`.
+
+**401 Unauthorized**
+```json
+{
+  "message": "Unauthorized"
+}
+```
+or
+```json
+{
+  "message": "Invalid or expired token"
+}
+```
+
+**404 Not Found**
+```json
+{
+  "message": "User not found"
+}
+```
+
+---
+
+## 2) Update My Profile
+
+### Endpoint
+`PUT /v1/api/users/me`
+
+### Description
+Updates `users` table (`business_name`, `phone_primary`) and updates/inserts row in `user_details` (`address`, `gst_number`).
+
+### Request JSON
+```json
+{
+  "business_name": "ABC Traders Pvt Ltd",
+  "phone_primary": "9999999999",
+  "address": "MG Road, Bangalore",
+  "gst_number": "29ABCDE1234F1Z5"
+}
+```
+
+### Validation
+- `business_name` is required and must be non-empty.
+- `gst_number` is optional, but if present must be valid GST format.
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "id": 1,
+  "business_name": "ABC Traders Pvt Ltd",
+  "email": "abc@gmail.com",
+  "phone_primary": "9999999999",
+  "public_key": "PUBLIC_KEY_VALUE",
+  "details": {
+    "address": "MG Road, Bangalore",
+    "phone": "9999999999",
+    "gst_number": "29ABCDE1234F1Z5"
+  }
+}
+```
+
+**400 Bad Request**
+```json
+{
+  "message": "business_name is required"
+}
+```
+or
+```json
+{
+  "message": "Invalid gst_number format"
+}
+```
+
+**404 Not Found**
+```json
+{
+  "message": "User not found"
+}
+```
+
+---
+
+## 3) Get Public User Profile
+
+### Endpoint
+`GET /v1/api/users/:id`
+
+### Description
+Returns only public profile fields for B2B discovery.
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "id": 2,
+  "business_name": "XYZ Suppliers",
+  "public_key": "PUBLIC_KEY_VALUE",
+  "gst_number": "27ABCDE1234F1Z9",
+  "is_verified": true
+}
+```
+
+### Not Returned
+- `email`
+- `phone_primary`
+- `password_hash`
+
+**404 Not Found**
+```json
+{
+  "message": "User not found"
+}
+```
+
+---
+
+## 4) Search Users
+
+### Endpoint
+`GET /v1/api/users/search?q=<search_text>`
+
+### Description
+Searches by `business_name` or `gst_number` (case-insensitive), limited to 10 results.
+
+### Query Parameter
+- `q` (required)
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "count": 2,
+  "results": [
+    {
+      "id": 1,
+      "business_name": "ABC Traders",
+      "gst_number": "29ABCDE1234F1Z5"
+    },
+    {
+      "id": 5,
+      "business_name": "ABC Components",
+      "gst_number": null
+    }
+  ]
+}
+```
+
+**400 Bad Request**
+```json
+{
+  "message": "Query parameter q is required"
+}
+```
+
+---
+
+# Request Module API Documentation
+
+Request Base Path: `/v1/api/requests`  
+Requires Header: `Authorization: Bearer <JWT_TOKEN>` for all endpoints below.
+
+State Flow: `CREATE -> SENT -> SEEN -> REVIEWED -> CONVERTED`
+
+## Common Response Envelope
+
+Successful responses use:
+```json
+{
+  "success": true,
+  "data": {}
+}
+```
+
+Error responses use:
+```json
+{
+  "success": false,
+  "message": "Error reason"
+}
+```
+
+## 1) Create Request
+
+### Endpoint
+`POST /v1/api/requests`
+
+### Request JSON
+```json
+{
+  "receiver_id": 2,
+  "request_data": {
+    "amount": 35000,
+    "note": "Need 30-day credit"
+  }
+}
+```
+
+### Rules
+- `sender_id` is always taken from JWT (`req.user.id`)
+- `request_id` is generated as UUID
+- `receiver_id` must be a number
+- `request_data` must be an object
+
+### Response JSON Outcomes
+
+**201 Created**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 10,
+    "request_id": "2f06afce-9226-4140-b15f-d19716ec7804",
+    "sender_id": 1,
+    "receiver_id": 2,
+    "request_data": {
+      "amount": 35000,
+      "note": "Need 30-day credit"
+    },
+    "is_reviewed": false,
+    "reviewed_at": null,
+    "is_converted_to_invoice": false,
+    "sent_at": "2026-05-01T11:30:00.000Z",
+    "is_seen": false,
+    "seen_at": null
+  }
+}
+```
+
+**400 Bad Request**
+```json
+{
+  "success": false,
+  "message": "receiver_id (number) and request_data (object) are required"
+}
+```
+
+## 2) List Requests (Limited Fields)
+
+### Endpoint
+`GET /v1/api/requests?type=sent|received`
+
+### Rules
+- `type=sent` returns rows where `sender_id = logged-in user`
+- `type=received` returns rows where `receiver_id = logged-in user`
+- limited to latest 20 records
+- only limited fields returned
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "request_id": "2f06afce-9226-4140-b15f-d19716ec7804",
+      "sender_id": 1,
+      "receiver_id": 2,
+      "sent_at": "2026-05-01T11:30:00.000Z"
+    }
+  ]
+}
+```
+
+**400 Bad Request**
+```json
+{
+  "success": false,
+  "message": "type must be either sent or received"
+}
+```
+
+## 3) Get Full Request
+
+### Endpoint
+`GET /v1/api/requests/:request_id`
+
+### Rules
+- only sender or receiver can read a request
+- if receiver fetches and `is_seen = false`, system auto-updates:
+  - `is_seen = true`
+  - `seen_at = NOW()`
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 10,
+    "request_id": "2f06afce-9226-4140-b15f-d19716ec7804",
+    "sender_id": 1,
+    "receiver_id": 2,
+    "request_data": {
+      "amount": 35000,
+      "note": "Need 30-day credit"
+    },
+    "is_reviewed": false,
+    "reviewed_at": null,
+    "is_converted_to_invoice": false,
+    "sent_at": "2026-05-01T11:30:00.000Z",
+    "is_seen": true,
+    "seen_at": "2026-05-01T11:32:05.000Z"
+  }
+}
+```
+
+**403 Forbidden**
+```json
+{
+  "success": false,
+  "message": "Unauthorized to access this request"
+}
+```
+
+**404 Not Found**
+```json
+{
+  "success": false,
+  "message": "Request not found"
+}
+```
+
+## 4) Update Request
+
+### Endpoint
+`PUT /v1/api/requests/:request_id`
+
+### Request JSON
+```json
+{
+  "receiver_id": 3,
+  "request_data": {
+    "amount": 50000,
+    "note": "Updated quantity"
+  }
+}
+```
+
+### Rules
+- only sender can update
+- only if `is_seen = false`
+- blocked if already converted
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "success": true,
+  "data": {
+    "request_id": "2f06afce-9226-4140-b15f-d19716ec7804",
+    "sender_id": 1,
+    "receiver_id": 3,
+    "request_data": {
+      "amount": 50000,
+      "note": "Updated quantity"
+    }
+  }
+}
+```
+
+**400 Bad Request**
+```json
+{
+  "success": false,
+  "message": "Seen request cannot be updated"
+}
+```
+or
+```json
+{
+  "success": false,
+  "message": "Converted request cannot be modified"
+}
+```
+
+**403 Forbidden**
+```json
+{
+  "success": false,
+  "message": "Only sender can update this request"
+}
+```
+
+## 5) Delete Request
+
+### Endpoint
+`DELETE /v1/api/requests/:request_id`
+
+### Rules
+- only sender can delete
+- only if `is_seen = false`
+- blocked if already converted
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "success": true,
+  "data": {
+    "request_id": "2f06afce-9226-4140-b15f-d19716ec7804",
+    "deleted": true
+  }
+}
+```
+
+**400 Bad Request**
+```json
+{
+  "success": false,
+  "message": "Seen request cannot be deleted"
+}
+```
+or
+```json
+{
+  "success": false,
+  "message": "Converted request cannot be deleted"
+}
+```
+
+**403 Forbidden**
+```json
+{
+  "success": false,
+  "message": "Only sender can delete this request"
+}
+```
+
+## 6) Review Request (Accept/Reject)
+
+### Endpoint
+`PUT /v1/api/requests/:request_id/review`
+
+### Request JSON
+```json
+{
+  "action": "accept"
+}
+```
+or
+```json
+{
+  "action": "reject"
+}
+```
+
+### Rules
+- only receiver can review
+- only if `is_reviewed = false`
+- blocked if already converted
+- on success:
+  - `is_reviewed = true`
+  - `reviewed_at = NOW()`
+  - `request_data.review_action = action`
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "success": true,
+  "data": {
+    "request_id": "2f06afce-9226-4140-b15f-d19716ec7804",
+    "is_reviewed": true,
+    "reviewed_at": "2026-05-01T11:40:00.000Z",
+    "request_data": {
+      "amount": 50000,
+      "note": "Updated quantity",
+      "review_action": "accept"
+    }
+  }
+}
+```
+
+**400 Bad Request**
+```json
+{
+  "success": false,
+  "message": "Request already reviewed"
+}
+```
+or
+```json
+{
+  "success": false,
+  "message": "Converted request cannot be reviewed again"
+}
+```
+
+**403 Forbidden**
+```json
+{
+  "success": false,
+  "message": "Only receiver can review this request"
+}
+```
+
+## 7) Convert Request to Invoice
+
+### Endpoint
+`PUT /v1/api/requests/:request_id/convert`
+
+### Rules
+- request must be reviewed first (`is_reviewed = true`)
+- only participants (sender or receiver) can convert
+- blocked if already converted
+- on success: `is_converted_to_invoice = true`
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "success": true,
+  "data": {
+    "request_id": "2f06afce-9226-4140-b15f-d19716ec7804",
+    "is_converted_to_invoice": true
+  }
+}
+```
+
+**400 Bad Request**
+```json
+{
+  "success": false,
+  "message": "Request must be reviewed before conversion"
+}
+```
+or
+```json
+{
+  "success": false,
+  "message": "Request already converted"
+}
+```
+
+**403 Forbidden**
+```json
+{
+  "success": false,
+  "message": "Unauthorized to convert this request"
+}
+```
+
+---
+
+# Transaction Module API Documentation
+
+Transaction Base Path: `/v1/api/transactions`  
+Requires Header: `Authorization: Bearer <JWT_TOKEN>` for all endpoints below.
+
+State Flow: `CREATED -> SEEN -> ACCEPTED -> ON_BLOCKCHAIN`
+
+## Common Response Envelope
+
+Successful responses use:
+```json
+{
+  "success": true,
+  "data": {}
+}
+```
+
+Error responses generally use:
+```json
+{
+  "message": "Error reason"
+}
+```
+or validation responses use:
+```json
+{
+  "success": false,
+  "message": "Error reason"
+}
+```
+
+## 1) Create Transaction
+
+### Endpoint
+`POST /v1/api/transactions`
+
+### Request JSON
+```json
+{
+  "receiver_id": 2,
+  "invoice_data": {
+    "amount": 42000,
+    "invoice_number": "A-101",
+    "items": [
+      { "name": "Steel Rod", "qty": 20, "rate": 2100 }
+    ]
+  }
+}
+```
+
+### Rules
+- `sender_id` comes from JWT (`req.user.id`)
+- `invoice_id` auto-generates as `INV-<timestamp>`
+- `receiver_id` must be a number
+- `invoice_data` must be an object
+
+### Response JSON Outcomes
+
+**201 Created**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "invoice_id": "INV-1746140000000",
+    "sender_id": 1,
+    "receiver_id": 2,
+    "invoice_data": {
+      "amount": 42000,
+      "invoice_number": "A-101"
+    },
+    "is_seen": false,
+    "seen_at": null,
+    "is_accepted": false,
+    "accepted_at": null,
+    "is_on_blockchain": false,
+    "created_at": "2026-05-01T18:00:00.000Z"
+  }
+}
+```
+
+**400 Bad Request**
+```json
+{
+  "success": false,
+  "message": "receiver_id (number) and invoice_data (object) are required"
+}
+```
+
+## 2) List Transactions
+
+### Endpoint
+`GET /v1/api/transactions?type=sent|received`
+
+### Rules
+- `type=sent` returns sender side transactions
+- `type=received` returns receiver side transactions
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "invoice_id": "INV-1746140000000",
+      "created_at": "2026-05-01T18:00:00.000Z",
+      "user_id": 2
+    }
+  ]
+}
+```
+
+**400 Bad Request**
+```json
+{
+  "success": false,
+  "message": "type must be either sent or received"
+}
+```
+
+## 3) Get Full Transaction
+
+### Endpoint
+`GET /v1/api/transactions/:id`
+
+### Rules
+- only sender or receiver can read
+- if receiver reads first time and `is_seen = false`, system auto-updates:
+  - `is_seen = true`
+  - `seen_at = NOW()`
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "invoice_id": "INV-1746140000000",
+    "sender_id": 1,
+    "receiver_id": 2,
+    "invoice_data": {
+      "amount": 42000
+    },
+    "is_seen": true,
+    "seen_at": "2026-05-01T18:05:00.000Z",
+    "is_accepted": false,
+    "is_on_blockchain": false
+  }
+}
+```
+
+**403 Forbidden**
+```json
+{
+  "message": "Unauthorized"
+}
+```
+
+**404 Not Found**
+```json
+{
+  "message": "Transaction not found"
+}
+```
+
+## 4) Update Transaction
+
+### Endpoint
+`PUT /v1/api/transactions/:id`
+
+### Request JSON
+```json
+{
+  "invoice_data": {
+    "amount": 45000,
+    "note": "Updated before viewed"
+  }
+}
+```
+
+### Rules
+- only sender can update
+- blocked once receiver has seen it (`is_seen = true`)
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "invoice_data": {
+      "amount": 45000,
+      "note": "Updated before viewed"
+    }
+  }
+}
+```
+
+**400 Bad Request**
+```json
+{
+  "message": "Cannot edit after seen"
+}
+```
+
+**403 Forbidden**
+```json
+{
+  "message": "Unauthorized"
+}
+```
+
+## 5) Delete Transaction
+
+### Endpoint
+`DELETE /v1/api/transactions/:id`
+
+### Rules
+- only sender can delete
+- blocked once receiver has seen it (`is_seen = true`)
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "success": true,
+  "message": "Deleted"
+}
+```
+
+**400 Bad Request**
+```json
+{
+  "message": "Cannot delete after seen"
+}
+```
+
+**403 Forbidden**
+```json
+{
+  "message": "Unauthorized"
+}
+```
+
+## 6) Accept Transaction (Writes to Blockchain)
+
+### Endpoint
+`POST /v1/api/transactions/:id/accept`
+
+### Rules
+- only receiver can accept
+- cannot accept twice
+- done in DB transaction with row lock (`FOR UPDATE`)
+- on success:
+  - `is_accepted = true`
+  - block is inserted in `blockchain`
+  - `is_on_blockchain = true`
+
+### Response JSON Outcomes
+
+**200 OK**
+```json
+{
+  "success": true,
+  "message": "Accepted and added to blockchain"
+}
+```
+
+**400 Bad Request**
+```json
+{
+  "message": "Already accepted"
+}
+```
+
+**403 Forbidden**
+```json
+{
+  "message": "Unauthorized"
+}
+```
+
+## 7) Verify Blockchain Integrity
+
+### Endpoint
+`POST /v1/api/transactions/:id/verify`
+
+### Rules
+- recomputes hash using stored block data + previous hash
+- compares with stored `current_hash`
+
+### Response JSON Outcomes
+
+**200 OK (valid)**
+```json
+{
+  "success": true,
+  "data": {
+    "valid": true,
+    "stored_hash": "6f2d...d1a0",
+    "recalculated_hash": "6f2d...d1a0"
+  }
+}
+```
+
+**200 OK (invalid/tampered)**
+```json
+{
+  "success": true,
+  "data": {
+    "valid": false,
+    "stored_hash": "6f2d...d1a0",
+    "recalculated_hash": "ab91...7f22"
+  }
+}
+```
+
+**200 OK (no block yet)**
+```json
+{
+  "success": true,
+  "data": {
+    "valid": false,
+    "reason": "No block found"
+  }
+}
+```

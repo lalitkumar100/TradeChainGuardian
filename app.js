@@ -3,6 +3,8 @@ const helmet = require("helmet");
 const cors = require("cors");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
+const requestRoutes = require("./routes/requestRoutes");
+const transactionRoutes = require("./routes/transactionRoutes");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
 const app = express();
@@ -18,6 +20,8 @@ app.get("/", (req, res) => {
 
 app.use("/auth", authRoutes);
 app.use("/v1/api/users", userRoutes);
+app.use("/v1/api/requests", requestRoutes);
+app.use("/v1/api/transactions", transactionRoutes);
 
 app.use(notFound);
 
