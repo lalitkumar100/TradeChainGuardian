@@ -118,6 +118,60 @@ const verify = asyncHandler(async (req, res) => {
   return res.status(200).json({ success: true, data: verification });
 });
 
+/**
+ * POST /v1/api/transactions/by-invoice
+ * Body: { invoice_no: "INV-xxxxx" }
+ *
+ * Looks up the transaction by invoice_id, validates that the requesting
+ * user is either the sender or receiver, then returns:
+ *   - Full transaction data
+ *   - created_at timestamp
+ *   - Sender info: sender_name (business_name) + sender_gst_no
+ */
+const getByInvoiceNo = asyncHandler(async (req, res) => {
+  const invoiceNo = req.body.invoice_no;
+
+  if (!invoiceNo || typeof invoiceNo !== "string" || !invoiceNo.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: "invoice_no (string) is required in the request body",
+    });
+  }
+
+  const tx = await transactionService.getTransactionByInvoiceNo(
+    invoiceNo.trim(),
+    req.user.id
+  );
+
+  return res.status(200).json({
+    success: true,
+    data: {
+      // ─── Core transaction fields ──────────────────────────────────────
+      id:               tx.id,
+      invoice_id:       tx.invoice_id,
+      sender_id:        tx.sender_id,
+      receiver_id:      tx.receiver_id,
+      request_id:       tx.request_id,
+      invoice_data:     tx.invoice_data,
+      is_accepted:      tx.is_accepted,
+      accepted_at:      tx.accepted_at,
+      is_on_blockchain: tx.is_on_blockchain,
+      is_seen:          tx.is_seen,
+      seen_at:          tx.seen_at,
+      created_at:       tx.created_at,          // ← explicit created_at
+
+      // ─── Sender full info ─────────────────────────────────────────────
+      sender_info: {
+        name:    tx.sender_name,
+        gst_no:  tx.sender_gst_no,
+      },
+
+      // ─── Receiver name (handy reference) ─────────────────────────────
+      receiver_name: tx.receiver_name,
+    },
+  });
+});
+
 module.exports = {
   create,
   list,
@@ -126,4 +180,5 @@ module.exports = {
   remove,
   accept,
   verify,
+  getByInvoiceNo,
 };

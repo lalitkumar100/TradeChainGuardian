@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-01T11:22:53.529Z",
+  "generatedAt": "2026-05-18T19:38:44.274Z",
   "totalTables": 5,
   "tables": {
     "public.blockchain": [
@@ -38,6 +38,24 @@
         "type": "timestamp without time zone",
         "nullable": "YES",
         "default": "CURRENT_TIMESTAMP"
+      },
+      {
+        "column": "eth_tx_hash",
+        "type": "character varying",
+        "nullable": "YES",
+        "default": "NULL::character varying"
+      },
+      {
+        "column": "eth_block_number",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "eth_contract_address",
+        "type": "character varying",
+        "nullable": "YES",
+        "default": "NULL::character varying"
       }
     ],
     "public.requests": [
@@ -168,6 +186,30 @@
         "type": "timestamp without time zone",
         "nullable": "YES",
         "default": "CURRENT_TIMESTAMP"
+      },
+      {
+        "column": "is_seen",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "false"
+      },
+      {
+        "column": "seen_at",
+        "type": "timestamp without time zone",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "eth_tx_hash",
+        "type": "character varying",
+        "nullable": "YES",
+        "default": "NULL::character varying"
+      },
+      {
+        "column": "eth_block_number",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null
       }
     ],
     "public.user_details": [

@@ -662,22 +662,17 @@ Error responses use:
 {
   "success": true,
   "data": {
-    "id": 10,
-    "request_id": "2f06afce-9226-4140-b15f-d19716ec7804",
-    "sender_id": 1,
-    "receiver_id": 2,
-    "request_data": {
-      "amount": 35000,
-      "note": "Need 30-day credit"
-    },
-    "is_reviewed": false,
-    "reviewed_at": null,
-    "is_converted_to_invoice": false,
-    "sent_at": "2026-05-01T11:30:00.000Z",
-    "is_seen": true,
-    "seen_at": "2026-05-01T11:32:05.000Z"
+    "id": 5,
+    "request_id": "604d75f9-...",
+    "sender_id": 3,
+    "receiver_id": 1,
+    "sender_name": "ABC Traders",
+    "receiver_name": "XYZ Distributors",
+    "request_data": { ... },
+    "request_type": "sender"   // "sender" or "receiver"
   }
 }
+
 ```
 
 **403 Forbidden**

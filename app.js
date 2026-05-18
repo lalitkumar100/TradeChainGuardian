@@ -6,11 +6,13 @@ const userRoutes = require("./routes/userRoutes");
 const requestRoutes = require("./routes/requestRoutes");
 const transactionRoutes = require("./routes/transactionRoutes");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
+const morgan = require("morgan");
 
 const app = express();
 
 app.use(helmet());
 app.use(cors());
+app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

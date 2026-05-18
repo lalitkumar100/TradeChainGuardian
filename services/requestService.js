@@ -18,38 +18,43 @@ async function createRequest({ requestId, senderId, receiverId, requestData }) {
 }
 
 async function getRequests({ userId, type }) {
-  let query = "";
-  let params = [];
+  const col = type === "sent" ? "sender_id" : "receiver_id";
 
-  if (type === "sent") {
-    query = `
-      SELECT request_id, sender_id, receiver_id, sent_at
-      FROM requests
-      WHERE sender_id = $1
-      ORDER BY sent_at DESC
-      LIMIT 20;
-    `;
-    params = [userId];
-  } else {
-    query = `
-      SELECT request_id, sender_id, receiver_id, sent_at
-      FROM requests
-      WHERE receiver_id = $1
-      ORDER BY sent_at DESC
-      LIMIT 20;
-    `;
-    params = [userId];
-  }
+  const query = `
+    SELECT
+      r.id,
+      r.request_id,
+      r.sender_id,
+      r.receiver_id,
+      r.sent_at AS created_at,
+      sender.business_name   AS sender_name,
+      receiver.business_name AS receiver_name,
+      CASE
+        WHEN r.is_reviewed = true THEN 'reviewed'
+        WHEN r.is_seen     = true THEN 'seen'
+        ELSE                           'unseen'
+      END AS status
+    FROM requests r
+    JOIN users sender   ON sender.id   = r.sender_id
+    JOIN users receiver ON receiver.id = r.receiver_id
+    WHERE r.${col} = $1
+    ORDER BY r.sent_at DESC;
+  `;
 
-  const { rows } = await pool.query(query, params);
+  const { rows } = await pool.query(query, [userId]);
   return rows;
 }
 
 async function getRequestById(requestId) {
   const query = `
-    SELECT *
-    FROM requests
-    WHERE request_id = $1
+    SELECT
+      r.*,
+      sender.business_name   AS sender_name,
+      receiver.business_name AS receiver_name
+    FROM requests r
+    JOIN users sender   ON sender.id   = r.sender_id
+    JOIN users receiver ON receiver.id = r.receiver_id
+    WHERE r.request_id = $1
     LIMIT 1;
   `;
 
@@ -66,7 +71,10 @@ async function markRequestSeen(requestId) {
   `;
 
   const { rows } = await pool.query(query, [requestId]);
-  return rows[0] || null;
+  if (!rows[0]) return null;
+
+  // Re-fetch with names joined
+  return getRequestById(requestId);
 }
 
 async function updateRequest({ requestId, senderId, receiverId, requestData }) {

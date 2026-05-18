@@ -21,9 +21,14 @@ async function getTransactions(userId, type) {
       t.sender_id,
       t.receiver_id,
       sender.business_name AS sender_name,
-      receiver.business_name AS receiver_name
+      receiver.business_name AS receiver_name,
+      CASE
+        WHEN t.is_accepted = true THEN 'accepted'
+        WHEN t.is_seen     = true THEN 'seen'
+        ELSE                           'unseen'
+      END AS status
     FROM transactions t
-    JOIN users sender ON sender.id = t.sender_id
+    JOIN users sender   ON sender.id   = t.sender_id
     JOIN users receiver ON receiver.id = t.receiver_id
   `;
 
@@ -40,7 +45,18 @@ async function getTransactions(userId, type) {
 }
 
 async function getTransactionById(id, userId) {
-  const result = await pool.query("SELECT * FROM transactions WHERE id = $1 LIMIT 1", [id]);
+  const result = await pool.query(
+    `SELECT
+       t.*,
+       sender.business_name   AS sender_name,
+       receiver.business_name AS receiver_name
+     FROM transactions t
+     JOIN users sender   ON sender.id   = t.sender_id
+     JOIN users receiver ON receiver.id = t.receiver_id
+     WHERE t.id = $1
+     LIMIT 1`,
+    [id]
+  );
   const tx = result.rows[0];
 
   if (!tx) {
@@ -63,10 +79,19 @@ async function getTransactionById(id, userId) {
        RETURNING *`,
       [id]
     );
-    return seenResult.rows[0];
+    const updated = seenResult.rows[0];
+    return {
+      ...updated,
+      sender_name: tx.sender_name,
+      receiver_name: tx.receiver_name,
+      transaction_type: "receiver",
+    };
   }
 
-  return tx;
+  return {
+    ...tx,
+    transaction_type: tx.sender_id === userId ? "sender" : "receiver",
+  };
 }
 
 async function updateTransaction(id, userId, invoiceData) {
@@ -183,6 +208,58 @@ async function acceptTransaction(id, userId) {
   }
 }
 
+/**
+ * Look up a transaction by its invoice_id (invoice_no).
+ * Returns the full transaction row plus the sender's:
+ *   - business_name  (public.users)
+ *   - gst_number     (public.user_details)
+ *
+ * Rules:
+ *  1. Only the RECEIVER of the transaction may call this route.
+ *  2. If the transaction is already accepted, an error is thrown.
+ */
+async function getTransactionByInvoiceNo(invoiceNo, userId) {
+  const result = await pool.query(
+    `SELECT
+       t.*,
+       sender.business_name              AS sender_name,
+       receiver.business_name            AS receiver_name,
+       COALESCE(ud.gst_number, '')       AS sender_gst_no
+     FROM transactions t
+     JOIN users sender          ON sender.id   = t.sender_id
+     JOIN users receiver        ON receiver.id = t.receiver_id
+     LEFT JOIN user_details ud  ON ud.user_id  = t.sender_id
+     WHERE t.invoice_id = $1
+     LIMIT 1`,
+    [invoiceNo]
+  );
+
+  const tx = result.rows[0];
+
+  // 1. Transaction must exist
+  if (!tx) {
+    const error = new Error(`Transaction with invoice_no '${invoiceNo}' not found`);
+    error.status = 404;
+    throw error;
+  }
+
+  // 2. Only the receiver is allowed to use this endpoint
+  if (tx.receiver_id !== userId) {
+    const error = new Error("Access denied: only the receiver can fetch this transaction");
+    error.status = 403;
+    throw error;
+  }
+
+  // 3. Reject if transaction is already accepted
+  if (tx.is_accepted) {
+    const error = new Error("This transaction has already been accepted");
+    error.status = 409;
+    throw error;
+  }
+
+  return tx;
+}
+
 module.exports = {
   createTransaction,
   getTransactions,
@@ -190,4 +267,5 @@ module.exports = {
   updateTransaction,
   deleteTransaction,
   acceptTransaction,
+  getTransactionByInvoiceNo,
 };

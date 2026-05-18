@@ -17,10 +17,14 @@ function isParticipant(request, userId) {
 
 function requestListItem(row) {
   return {
-    request_id: row.request_id,
-    sender_id: row.sender_id,
-    receiver_id: row.receiver_id,
-    sent_at: row.sent_at,
+    id:            row.id,
+    request_id:    row.request_id,
+    created_at:    row.created_at,
+    sender_id:     row.sender_id,
+    receiver_id:   row.receiver_id,
+    sender_name:   row.sender_name,
+    receiver_name: row.receiver_name,
+    status:        row.status,
   };
 }
 
@@ -97,7 +101,10 @@ const getRequestById = asyncHandler(async (req, res) => {
 
   return res.status(200).json({
     success: true,
-    data: result,
+    data: {
+      ...result,
+      request_type: result.sender_id === req.user.id ? "sender" : "receiver",
+    },
   });
 });
 

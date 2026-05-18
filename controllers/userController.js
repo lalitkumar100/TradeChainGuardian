@@ -24,6 +24,9 @@ function formatPublicProfileResponse(profile) {
   return {
     id: profile.id,
     business_name: profile.business_name,
+    email: profile.email,
+    phone: profile.phone,
+    address: profile.address,
     public_key: profile.public_key,
     gst_number: profile.gst_number,
     is_verified: profile.is_verified,

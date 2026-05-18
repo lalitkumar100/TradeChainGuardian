@@ -111,7 +111,13 @@ async function login(req, res, next) {
       expiresIn: "1d",
     });
 
-    return res.status(200).json({ token });
+    const loginTime = new Date().toISOString();
+
+    return res.status(200).json({
+      token,
+      business_name: user.business_name,
+      loginTime
+    });
   } catch (error) {
     return next(error);
   }

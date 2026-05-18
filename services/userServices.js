@@ -73,8 +73,11 @@ async function getPublicUserById(userId) {
     SELECT
       u.id,
       u.business_name,
+      u.email,
+      u.phone_primary as phone,
       u.public_key,
       u.is_verified,
+      ud.address,
       ud.gst_number
     FROM users u
     LEFT JOIN user_details ud ON u.id = ud.user_id

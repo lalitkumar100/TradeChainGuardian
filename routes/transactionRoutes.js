@@ -6,6 +6,10 @@ const router = express.Router();
 
 router.post("/", requireAuth, transactionController.create);
 router.get("/", requireAuth, transactionController.list);
+
+// Must be registered BEFORE /:id to avoid Express treating 'by-invoice' as an id param
+router.post("/by-invoice", requireAuth, transactionController.getByInvoiceNo);
+
 router.get("/:id", requireAuth, transactionController.getById);
 router.put("/:id", requireAuth, transactionController.update);
 router.delete("/:id", requireAuth, transactionController.remove);
